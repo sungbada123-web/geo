@@ -109,10 +109,29 @@ async def run():
         # 生成并保存报告
         report_path = reporter.save()
         
-        # 尝试自动提交到 GitHub (如果在 git 仓库中)
-        # 注意：这需要服务器配置了 SSH Key 或 Token，否则会卡住
-        # 我们这里只生成文件，让外层脚本决定是否 push
-        pass
+        # 尝试自动提交到 GitHub
+        if os.path.exists(os.path.join(REPO_DIR, ".git")):
+            reporter.log("正在同步报告到 GitHub...")
+            import subprocess
+            
+            # 1. Pull 最新代码 (防止冲突)
+            subprocess.run(["git", "pull"], cwd=REPO_DIR, check=False)
+            
+            # 2. Add 报告和截图
+            subprocess.run(["git", "add", "GEO_Reports/"], cwd=REPO_DIR, check=False)
+            
+            # 3. Commit
+            commit_msg = f"Auto: Daily Report {reporter.start_time.strftime('%Y-%m-%d')}"
+            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_DIR, check=False)
+            
+            # 4. Push
+            # 注意：这依赖于 remote url 中包含 token，或者已经配置了 credential helper
+            result = subprocess.run(["git", "push"], cwd=REPO_DIR, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                reporter.log("✅ 报告已成功推送到 GitHub")
+            else:
+                reporter.log(f"⚠️ Push 失败 (可能是权限问题): {result.stderr}")
 
 if __name__ == "__main__":
     asyncio.run(run())
