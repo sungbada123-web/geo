@@ -26,3 +26,8 @@
 *   **URL**: [Localhost or Cloud URL]
 *   **Auth**: [Setup Pending]
 
+### GitHub
+*   **Username**: `sungbada123-web`
+*   **Repo**: `geo`
+*   **PAT (GEO-Cloud)**: `ghp_****** (Configured on Server)`
+
