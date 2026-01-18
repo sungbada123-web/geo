@@ -3,12 +3,11 @@ import random
 import datetime
 import time
 import requests
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
+from vertexai.preview.vision_models import ImageGenerationModel
 
 # 配置
-# 从环境变量获取 API Key (部署时会在命令里 set)
-API_KEY = os.environ.get("GEMINI_API_KEY", "") 
-
 OUTPUT_MARKDOWN = "../Platform_XHS_Pauhex.md"
 
 # 高端选题库
@@ -23,16 +22,35 @@ TOPICS = [
     "工业 4.0 时代的个人医疗终端：PAUHEX 生产工艺揭秘"
 ]
 
+def get_project_id():
+    """从 GCP VM 元数据服务器获取 Project ID"""
+    try:
+        response = requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/project/project-id",
+            headers={"Metadata-Flavor": "Google"},
+            timeout=2
+        )
+        if response.status_code == 200:
+            return response.text.strip()
+    except:
+        pass
+    # Fallback to env or hardcoded known ID from user screenshot
+    return os.environ.get("GOOGLE_CLOUD_PROJECT", "project-992dcbbe-900d-4588-87c")
+
 class ContentEngine:
     def __init__(self):
         self.logs = []
-        if not API_KEY:
-             self.log("⚠️ 警告: 未检测到 GEMINI_API_KEY 环境变量")
+        project_id = get_project_id()
+        location = "us-central1" # Imagen 3 必须在 us-central1
         
         try:
-            genai.configure(api_key=API_KEY)
-            self.model_text = genai.GenerativeModel('gemini-1.5-pro')
-            self.log(f"✅ Gemini AI (Free Tier) 初始化成功")
+            self.log(f"🔄 初始化 Vertex AI (Project: {project_id})...")
+            vertexai.init(project=project_id, location=location)
+            
+            self.model_text = GenerativeModel("gemini-1.5-pro-001")
+            self.model_image = ImageGenerationModel.from_pretrained("imagen-3.0-generate-001")
+            self.log("✅ Vertex AI (Gemini + Imagen 3) 初始化成功")
+            
         except Exception as e:
             self.log(f"❌ 初始化失败: {e}")
             raise e
@@ -72,28 +90,29 @@ class ContentEngine:
             return f"# 生成失败\n\n原因: {e}"
 
     def draw_images(self, topic):
-        self.log("🎨 正在绘制配图 (Pollinations AI)...")
-        # 使用 Pollinations.ai 免费生成高质量图片 (无需 Key)
-        prompt = f"High quality, photorealistic, cinematic lighting, medical tech, {topic}, futuristic, clean white background, Apple product photography"
-        encoded_prompt = requests.utils.quote(prompt)
-        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1920&height=1080&nologo=true"
+        self.log("🎨 正在绘制配图 (Imagen 3 Premium)...")
+        prompt = f"""
+        High quality, photorealistic, cinematic lighting, medical tech, futuristic, clean white background.
+        Subject: {topic}
+        Style: Apple product photography, macro lens, shallow depth of field.
+        """
         
         try:
-            response = requests.get(image_url, timeout=30)
-            if response.status_code == 200:
-                image_filename = f"image_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-                image_path = os.path.join(os.path.dirname(__file__), "..", image_filename)
-                
-                with open(image_path, 'wb') as f:
-                    f.write(response.content)
-                    
-                self.log(f"✅ 图片生成完成: {image_filename}")
-                return image_filename
-            else:
-                self.log(f"⚠️ 图片下载失败: Status {response.status_code}")
-                return None
+            response = self.model_image.generate_images(
+                prompt=prompt,
+                number_of_images=1,
+                aspect_ratio="16:9"
+            )
+            
+            image_filename = f"image_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            image_path = os.path.join(os.path.dirname(__file__), "..", image_filename)
+            
+            response[0].save(image_path)
+            self.log(f"✅ 图片生成完成: {image_filename}")
+            return image_filename
+            
         except Exception as e:
-            self.log(f"⚠️ 图片生成异常: {e}")
+            self.log(f"⚠️ 图片生成失败: {e}")
             return None
 
     def start(self):
@@ -103,10 +122,8 @@ class ContentEngine:
         
         content = []
         if image_name:
-            # 使用相对路径，确保发布脚本能找到
-            # 但为了 Markdown 预览正常，尽量用兼容格式
-            # 这里的路径策略：Markdown 文件和图片在同一级目录 (分药器GEO/xxx.md 和 分药器GEO/xxx.jpg)
-            content.append(f"![Header Image](file:///{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', image_name)).replace(os.sep, '/')})\n\n")
+            abs_image_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', image_name)).replace(os.sep, '/')
+            content.append(f"![Header Image](file:///{abs_image_path})\n\n")
         
         content.append(article)
         final_markdown = "".join(content)
