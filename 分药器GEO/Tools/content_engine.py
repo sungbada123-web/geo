@@ -44,18 +44,32 @@ class ContentEngine:
         location = "us-central1" # Imagen 3 必须在 us-central1
         
         try:
-            # 1. 文本生成: 使用亚洲节点 (降低 404 概率)
-            text_location = "asia-east1"
+            # 1. 文本生成: 使用东京节点 (亚洲 AI 核心区，支持 Gemini 1.5)
+            text_location = "asia-northeast1"
             self.log(f"🔄 初始化 Vertex AI 文本引擎 (Project: {project_id}, Region: {text_location})...")
             vertexai.init(project=project_id, location=text_location)
             
-            # 使用通用别名，它会自动指向该区域可用的最新稳定版
-            self.model_text = GenerativeModel("gemini-1.5-pro")
+            # 智能重试循环 (防止单点故障)
+            model_candidates = [
+                "gemini-1.5-pro",
+                "gemini-1.5-flash",
+                "gemini-1.0-pro"
+            ]
             
-            # 简单验证一下
-            self.log("🧪 测试文本模型连接...")
-            self.model_text.generate_content("Hi")
-            self.log(f"✅ 文本模型初始化成功 (Region: {text_location})")
+            self.model_text = None
+            for model_name in model_candidates:
+                try:
+                    self.log(f"🔄 尝试加载文本模型: {model_name}...")
+                    temp_model = GenerativeModel(model_name)
+                    temp_model.generate_content("Hi") 
+                    self.model_text = temp_model
+                    self.log(f"✅ 成功加载文本模型: {model_name}")
+                    break
+                except Exception as e:
+                    self.log(f"⚠️ 模型 {model_name} [Region: {text_location}] 不可用: {e}")
+
+            if not self.model_text:
+                raise Exception(f"东京节点 ({text_location}) 所有模型均不可用，建议迁移至美国服务器。")
 
             # 2. 图片生成: 必须切回 us-central1
             img_location = "us-central1"
