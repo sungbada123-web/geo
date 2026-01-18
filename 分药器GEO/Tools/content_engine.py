@@ -44,8 +44,8 @@ class ContentEngine:
         location = "us-central1" # Imagen 3 必须在 us-central1
         
         try:
-            # 1. 文本生成: 使用东京节点 (亚洲 AI 核心区，支持 Gemini 1.5)
-            text_location = "asia-northeast1"
+            # 1. 文本生成: 强制使用美国节点 (US-Central1 资源最全)
+            text_location = "us-central1"
             self.log(f"🔄 初始化 Vertex AI 文本引擎 (Project: {project_id}, Region: {text_location})...")
             vertexai.init(project=project_id, location=text_location)
             
