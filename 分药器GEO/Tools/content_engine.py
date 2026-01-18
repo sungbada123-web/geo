@@ -64,7 +64,8 @@ class ContentEngine:
                     self.log(f"✅ 成功加载文本模型: {model_name}")
                     break
                 except Exception as e:
-                    self.log(f"⚠️ 模型 {model_name} 不可用, 尝试下一个...")
+                    self.log(f"⚠️ 模型 {model_name} 不可用: {str(e)}")
+                    # Continue trying next model
 
             if not self.model_text:
                 raise Exception("所有文本模型均不可用 (Verified: Pro-002, Flash-002, Pro-001, Flash-001, Pro)")
