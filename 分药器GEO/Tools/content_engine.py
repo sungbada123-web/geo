@@ -47,7 +47,7 @@ class ContentEngine:
             self.log(f"🔄 初始化 Vertex AI (Project: {project_id})...")
             vertexai.init(project=project_id, location=location)
             
-            self.model_text = GenerativeModel("gemini-1.5-pro-001")
+            self.model_text = GenerativeModel("gemini-1.5-pro")
             self.model_image = ImageGenerationModel.from_pretrained("imagen-3.0-generate-001")
             self.log("✅ Vertex AI (Gemini + Imagen 3) 初始化成功")
             
