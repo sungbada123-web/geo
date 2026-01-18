@@ -44,34 +44,31 @@ class ContentEngine:
         location = "us-central1" # Imagen 3 必须在 us-central1
         
         try:
-            # 尝试多种模型版本，防止 404
-            model_candidates = [
-                "gemini-1.5-pro-002",  # 最新版 Pro
-                "gemini-1.5-flash-002", # 最新版 Flash
-                "gemini-1.5-pro-001",  # 旧版 Pro
-                "gemini-1.5-flash-001", # 旧版 Flash
-                "gemini-pro"           # 经典版
-            ]
+            # 1. 文本生成: 使用亚洲节点 (降低 404 概率)
+            text_location = "asia-east1"
+            self.log(f"🔄 初始化 Vertex AI 文本引擎 (Project: {project_id}, Region: {text_location})...")
+            vertexai.init(project=project_id, location=text_location)
             
-            self.model_text = None
-            for model_name in model_candidates:
-                try:
-                    self.log(f"🔄 尝试加载文本模型: {model_name}...")
-                    # 尝试生成一个极短的文本来验证模型是否存在
-                    temp_model = GenerativeModel(model_name)
-                    temp_model.generate_content("test") 
-                    self.model_text = temp_model
-                    self.log(f"✅ 成功加载文本模型: {model_name}")
-                    break
-                except Exception as e:
-                    self.log(f"⚠️ 模型 {model_name} 不可用: {str(e)}")
-                    # Continue trying next model
+            # 使用通用别名，它会自动指向该区域可用的最新稳定版
+            self.model_text = GenerativeModel("gemini-1.5-pro")
+            
+            # 简单验证一下
+            self.log("🧪 测试文本模型连接...")
+            self.model_text.generate_content("Hi")
+            self.log(f"✅ 文本模型初始化成功 (Region: {text_location})")
 
-            if not self.model_text:
-                raise Exception("所有文本模型均不可用 (Verified: Pro-002, Flash-002, Pro-001, Flash-001, Pro)")
-
+            # 2. 图片生成: 必须切回 us-central1
+            img_location = "us-central1"
+            self.log(f"🔄 初始化 Vertex AI 图像引擎 (Project: {project_id}, Region: {img_location})...")
+            # 注意: 这里重新 init 会覆盖上面的全局配置，所以后面生成图片时环境是对的
+            # 但为了安全起见，我们在 draw_images 方法里最好再以此确认一下
+            vertexai.init(project=project_id, location=img_location)
             self.model_image = ImageGenerationModel.from_pretrained("imagen-3.0-generate-001")
-            self.log("✅ Vertex AI (Gemini + Imagen 3) 初始化成功")
+            self.log("✅ 图像模型初始化成功")
+            
+        except Exception as e:
+            self.log(f"❌ 初始化失败: {str(e)}")
+            raise e
             
         except Exception as e:
             self.log(f"❌ 初始化失败: {e}")
