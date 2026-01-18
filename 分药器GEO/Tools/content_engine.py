@@ -44,10 +44,31 @@ class ContentEngine:
         location = "us-central1" # Imagen 3 必须在 us-central1
         
         try:
-            self.log(f"🔄 初始化 Vertex AI (Project: {project_id})...")
-            vertexai.init(project=project_id, location=location)
+            # 尝试多种模型版本，防止 404
+            model_candidates = [
+                "gemini-1.5-pro-002",  # 最新版 Pro
+                "gemini-1.5-flash-002", # 最新版 Flash
+                "gemini-1.5-pro-001",  # 旧版 Pro
+                "gemini-1.5-flash-001", # 旧版 Flash
+                "gemini-pro"           # 经典版
+            ]
             
-            self.model_text = GenerativeModel("gemini-1.5-pro")
+            self.model_text = None
+            for model_name in model_candidates:
+                try:
+                    self.log(f"🔄 尝试加载文本模型: {model_name}...")
+                    # 尝试生成一个极短的文本来验证模型是否存在
+                    temp_model = GenerativeModel(model_name)
+                    temp_model.generate_content("test") 
+                    self.model_text = temp_model
+                    self.log(f"✅ 成功加载文本模型: {model_name}")
+                    break
+                except Exception as e:
+                    self.log(f"⚠️ 模型 {model_name} 不可用, 尝试下一个...")
+
+            if not self.model_text:
+                raise Exception("所有文本模型均不可用 (Verified: Pro-002, Flash-002, Pro-001, Flash-001, Pro)")
+
             self.model_image = ImageGenerationModel.from_pretrained("imagen-3.0-generate-001")
             self.log("✅ Vertex AI (Gemini + Imagen 3) 初始化成功")
             
